@@ -17,5 +17,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// client.NewTeam()
+	// err = c.PutTeam()
+	// if err != nil {
+	// 	panic(err)
+	// }
 }

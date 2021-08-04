@@ -1,19 +1,26 @@
 package client
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
 
+type JSON map[string]interface{}
+type JSON_LIST []map[string]interface{}
+
+type DepTrackPermission struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+type DepTrackPermissionsList []DepTrackPermission
+
 type DepTrackTeamPut struct {
-	Name string `json:"name"`
+	Name        string                  `json:"name"`
+	Permissions DepTrackPermissionsList `json:"permissions"`
 }
 
 type DepTrackClient struct {
@@ -31,6 +38,8 @@ func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
 	return &DepTrackClient{ApiClient: client}, nil
 }
 
+// func (depClient *DepTrackClient) sendRequestForm(req *http.Request, response interface{}) error {
+
 func (depClient *DepTrackClient) Login(username string, password string) error {
 
 	login_values := url.Values{
@@ -38,12 +47,7 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 		"password": {password}, //Read from env DEPEND_TRACK_PASS
 	}
 
-	req, err := http.NewRequest("POST", JoinURL(depClient.Cfg.Url, "user/login"), strings.NewReader(login_values.Encode()))
-	if err != nil {
-		return err
-	}
-
-	resp, err := depClient.sendRequest(req, "application/x-www-form-urlencoded")
+	resp, err := depClient.Post("user/login", "application/x-www-form-urlencoded", strings.NewReader(login_values.Encode()))
 	if err != nil {
 		return err
 	}
@@ -56,58 +60,31 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 	return nil
 }
 
-//2DO move to api client
-func (depClient *DepTrackClient) Get(api string) error {
-	req, _ := http.NewRequest("GET", JoinURL(depClient.Cfg.Url, api), nil)
-	resp, err := depClient.sendRequest(req, "application/json")
+func (depClient *DepTrackClient) GetJsonList(api string) error {
+	var dst JSON_LIST
+	err := depClient.GetJson(api, &dst)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	b, _ := ioutil.ReadAll(resp.Body)
-
-	dst := &bytes.Buffer{}
-	if err := json.Indent(dst, b, "", "  "); err != nil {
-		return err
-	}
-
-	fmt.Println(dst.String())
 	return nil
 }
 
-// func (depClient *DepTrackClient) Put(url string, contentType string, body io.Reader) (resp *http.Response, err error) {
-// 	req, err := http.NewRequest("PUT", url, body)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	if depClient.token != "" {
-// 		req.Header.Add("Authorization", "Bearer "+depClient.token)
-// 	}
-// 	req.Header.Set("Content-Type", contentType)
-// 	return depClient.Client.Do(req)
-// }
-
-// func (depClient *DepTrackClient) PutJson(url string, body interface{}) {
-// 	v, _ := json.Marshal(body)
-// 	resp, err := depClient.Put(url, "application/json", bytes.NewBuffer(v))
-// 	if err != nil {
-// 		os.Exit(1)
-// 	}
-// 	b, _ := ioutil.ReadAll(resp.Body)
-
-// 	dst := &bytes.Buffer{}
-// 	if err := json.Indent(dst, b, "", "  "); err != nil {
-// 		panic(err)
-// 	}
-
-// 	fmt.Println(dst.String())
-// }
-
 func (depClient *DepTrackClient) GetTeam() error {
-	return depClient.Get("team")
+	return depClient.GetJsonList("team")
 }
 
-// func (depClient *DepTrackClient) NewTeam() {
-// 	data := DepTrackTeamPut{Name: "scribe_backend2"}
-// 	depClient.PutJson("http://localhost:8081/api/v1/team", data)
+// func (depClient *DepTrackClient) PutTeam() error {
+// 	var dst JSON
+// 	body := DepTrackTeamPut{Name: "scribe_backend2", Permissions: DepTrackPermissionsList{DepTrackPermission{Name: "ACCESS_MANAGEMENT"}}}
+// 	v, err := json.Marshal(body)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	err = depClient.PutJson("team", bytes.NewBuffer(v), &dst)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	fmt.Println(dst)
+// 	return nil
+// 	// 	depClient.PutJson("http://localhost:8081/api/v1/team", data)
 // }

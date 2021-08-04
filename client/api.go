@@ -1,8 +1,11 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"path"
 	"strings"
@@ -73,13 +76,82 @@ func (c ApiClient) Is_enabled() bool {
 	return c.Cfg.Enable
 }
 
-func (c *ApiClient) sendRequest(req *http.Request, Content_type string) (*http.Response, error) {
+func (c *ApiClient) NewRequest(method, api string, body io.Reader) (*http.Request, error) {
+	return http.NewRequest(method, JoinURL(c.Cfg.Url, api), body)
 
+}
+
+func (c *ApiClient) sendRequestJson(req *http.Request, response interface{}) error {
+	resp, err := c.sendRequest(req, "application/json")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	v, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	err = json.Unmarshal(v, &response)
+	if err != nil {
+		return err
+	}
+	// if response != nil {
+	// 	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
+	// 		return err
+	// 	}
+
+	// }
+	return nil
+}
+
+func (c *ApiClient) Post(api, contentType string, body io.Reader) (resp *http.Response, err error) {
+	req, err := c.NewRequest("POST", api, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.sendRequest(req, contentType)
+}
+
+func (c *ApiClient) PutJson(api string, body io.Reader, response interface{}) error {
+	req, err := c.NewRequest("PUT", api, body)
+	if err != nil {
+		return err
+	}
+	return c.sendRequestJson(req, response)
+}
+
+func (c *ApiClient) Put(api, contentType string, body io.Reader) (resp *http.Response, err error) {
+	req, err := c.NewRequest("PUT", api, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.sendRequest(req, contentType)
+}
+
+func (c *ApiClient) GetJson(api string, response interface{}) (err error) {
+	req, err := c.NewRequest("GET", api, nil)
+	if err != nil {
+		return err
+	}
+	return c.sendRequestJson(req, response)
+}
+
+func (c *ApiClient) Get(api string) (resp *http.Response, err error) {
+	req, err := c.NewRequest("GET", api, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.sendRequest(req, "")
+}
+
+func (c *ApiClient) sendRequest(req *http.Request, Content_type string) (*http.Response, error) {
 	if c.Cfg != nil && c.Cfg.Url == "" {
 		return nil, errors.New("URL not set")
 	}
 
-	req.Header.Set("Content-Type", fmt.Sprintf(CONTENT_TYPE_FORMAT, Content_type))
+	if Content_type != "" {
+		req.Header.Set("Content-Type", fmt.Sprintf(CONTENT_TYPE_FORMAT, Content_type))
+	}
 	if c.Cfg.Token != "" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Cfg.Token))
 	} else if c.Cfg.Username != "" && c.Cfg.Password != "" {
