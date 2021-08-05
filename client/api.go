@@ -21,10 +21,11 @@ const (
 )
 
 type ServiceCfg struct {
-	Url      string `yaml:"url" json:"url" mapstructure:"url"`                // Scribe backend url
-	Token    string `yaml:"token" json:"token" mapstructure:"token"`          // -t, Scribe backend access token
-	Username string `yaml:"username" json:"username" mapstructure:"username"` // -u, Scribe backend access token
-	Password string `yaml:"password" json:"password" mapstructure:"password"` // -p, Scribe backend access token
+	Url      string `yaml:"url" json:"url" mapstructure:"url"`
+	Token    string `yaml:"token" json:"token" mapstructure:"token"`
+	ApiToken string `yaml:"apitoken" json:"apitoken" mapstructure:"apitoken"`
+	Username string `yaml:"username" json:"username" mapstructure:"username"`
+	Password string `yaml:"password" json:"password" mapstructure:"password"`
 	Enable   bool   `yaml:"enable" json:"enable" mapstructure:"enable"`
 }
 
@@ -144,6 +145,30 @@ func (c *ApiClient) Get(api string) (resp *http.Response, err error) {
 	return c.sendRequest(req, "")
 }
 
+func (c *ApiClient) SetAuthorization(req *http.Request) bool {
+	if c.Cfg.Token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Cfg.Token))
+		return true
+	}
+	return false
+}
+
+func (c *ApiClient) SetApiKey(req *http.Request) bool {
+	if c.Cfg.ApiToken != "" {
+		req.Header.Set("X-Api-Key", c.Cfg.ApiToken)
+		return true
+	}
+	return false
+}
+
+func (c *ApiClient) SetBasicAuth(req *http.Request) bool {
+	if c.Cfg.Username != "" && c.Cfg.Password != "" {
+		req.SetBasicAuth(c.Cfg.Username, c.Cfg.Password)
+		return true
+	}
+	return false
+}
+
 func (c *ApiClient) sendRequest(req *http.Request, Content_type string) (*http.Response, error) {
 	if c.Cfg != nil && c.Cfg.Url == "" {
 		return nil, errors.New("URL not set")
@@ -152,10 +177,13 @@ func (c *ApiClient) sendRequest(req *http.Request, Content_type string) (*http.R
 	if Content_type != "" {
 		req.Header.Set("Content-Type", fmt.Sprintf(CONTENT_TYPE_FORMAT, Content_type))
 	}
-	if c.Cfg.Token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Cfg.Token))
-	} else if c.Cfg.Username != "" && c.Cfg.Password != "" {
-		req.SetBasicAuth(c.Cfg.Username, c.Cfg.Password)
+
+	if c.SetAuthorization(req) {
+		log.Debug("Api client - Authorization")
+	} else if c.SetApiKey(req) {
+		log.Debug("Api client - Api key auth")
+	} else if c.SetBasicAuth(req) {
+		log.Debug("Api client - Basic auth")
 	}
 
 	res, err := c.HTTPClient.Do(req)

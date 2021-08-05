@@ -30,15 +30,13 @@ type DepTrackClient struct {
 }
 
 func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
-	cfg := ServiceCfg{Token: access_token, Url: "http://localhost:8081/api/v1", Enable: true}
+	cfg := ServiceCfg{ApiToken: access_token, Url: "http://localhost:8081/api/v1", Enable: true}
 	client, err := NewApiClient(&cfg)
 	if err != nil {
 		return nil, err
 	}
 	return &DepTrackClient{ApiClient: client}, nil
 }
-
-// func (depClient *DepTrackClient) sendRequestForm(req *http.Request, response interface{}) error {
 
 func (depClient *DepTrackClient) Login(username string, password string) error {
 
@@ -60,31 +58,15 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 	return nil
 }
 
-func (depClient *DepTrackClient) GetJsonList(api string) error {
+func (depClient *DepTrackClient) GetJsonList(api string) (JSON_LIST, error) {
 	var dst JSON_LIST
 	err := depClient.GetJson(api, &dst)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return dst, nil
 }
 
-func (depClient *DepTrackClient) GetTeam() error {
+func (depClient *DepTrackClient) GetTeam() (JSON_LIST, error) {
 	return depClient.GetJsonList("team")
 }
-
-// func (depClient *DepTrackClient) PutTeam() error {
-// 	var dst JSON
-// 	body := DepTrackTeamPut{Name: "scribe_backend2", Permissions: DepTrackPermissionsList{DepTrackPermission{Name: "ACCESS_MANAGEMENT"}}}
-// 	v, err := json.Marshal(body)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	err = depClient.PutJson("team", bytes.NewBuffer(v), &dst)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	fmt.Println(dst)
-// 	return nil
-// 	// 	depClient.PutJson("http://localhost:8081/api/v1/team", data)
-// }
