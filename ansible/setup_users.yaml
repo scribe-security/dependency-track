@@ -4,8 +4,18 @@
     vars:
       - deptrack_base_url: http://localhost:8081
       - deptrack_url: "{{ deptrack_base_url }}/api/v1"
+      - default_admin_pass: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          36323662656563663663333837356334666461366637316235343336363132643133306664396632
+          6335326538616164353064373336616630666535333337330a386363616531383437373937346466
+          36386438373662613263646239323966353837303530326430333064633163313965353463613436
+          3633303133376164620a306335383939353330353934666338373466356639623130643063383831
+          61316665616636626235363038366162633433643764393435616462646333343866
     connection: local 
     tasks:
+      
+    - debug:
+        var: default_admin_pass
 
     - name: "wait for api service to come up"
       uri:
@@ -24,8 +34,8 @@
         body:
           username: admin
           password: admin
-          newPassword: KeepCalm!
-          confirmPassword: KeepCalm!
+          newPassword: "{{ default_admin_pass }}"
+          confirmPassword: "{{ default_admin_pass }}"
         status_code: 200
       failed_when: false
 
@@ -38,7 +48,7 @@
         return_content: yes
         body:
           username: admin
-          password: KeepCalm!
+          password: "{{ default_admin_pass }}"
         status_code: 200
       register: login
 

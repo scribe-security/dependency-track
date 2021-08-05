@@ -28,6 +28,7 @@ bootstrap-dtrack: $(TEMPDIR) ## Download dependancy track latest docker-compose 
 	$(call title,Bootstrapping dependancy track)
 	@curl -L -o $(TEMPDIR)/docker-compose.yaml https://dependencytrack.org/docker-compose.yml 
 	@sudo apt install ansible
+
 # .PHONY: bootstrap-go
 # bootstrap-go:
 # 	go mod download
@@ -74,7 +75,7 @@ tail-local: ## Tail service logs (docker-compose)
 
 .PHONY: tail
 setup-users: ## Setup initial users and teams
-	@ansible-playbook ansible/setup_users.yaml
+	@ansible-playbook ansible/setup_users.yaml --ask-vault-pass
 
 # .PHONY: build
 # build: $(SNAPSHOTDIR) ## Build release snapshot binaries and packages
