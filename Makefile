@@ -27,7 +27,7 @@ help:
 bootstrap-dtrack: $(TEMPDIR) ## Download dependancy track latest docker-compose - see .tmp
 	$(call title,Bootstrapping dependancy track)
 	@curl -L -o $(TEMPDIR)/docker-compose.yaml https://dependencytrack.org/docker-compose.yml 
-
+	@sudo apt install ansible
 # .PHONY: bootstrap-go
 # bootstrap-go:
 # 	go mod download
@@ -39,6 +39,7 @@ bootstrap-dtrack: $(TEMPDIR) ## Download dependancy track latest docker-compose 
 .PHONY: start-local
 start-local:  ## Deploy local API, Frontend services (docker-compose)
 	@docker-compose -p ${PROJECT} -f $(DOCKER_COMPOSE) up  -d 
+	@make setup-users
 
 .PHONY: stop-local
 stop-local:  ## Stop local API, Frontend services (docker-compose)
@@ -56,7 +57,7 @@ info-local: ## Display services info (docker-compose)
 	@docker-compose -p ${PROJECT} -f $(DOCKER_COMPOSE) ps
 
 .PHONY: clean-local
-clean-local: ##Clean local API, Frontend services (docker-compose)
+clean-local: ## Clean local API, Frontend services (docker-compose)
 	@docker-compose -p ${PROJECT} -f $(DOCKER_COMPOSE) down -v
 
 .PHONY: attach-local
@@ -70,6 +71,10 @@ attach-log-local: ## Attach to api log (docker-compose)
 .PHONY: tail
 tail-local: ## Tail service logs (docker-compose)
 	@docker-compose -p ${PROJECT}  -f $(DOCKER_COMPOSE) logs -f
+
+.PHONY: tail
+setup-users: ## Setup initial users and teams
+	@ansible-playbook ansible/setup_users.yaml
 
 # .PHONY: build
 # build: $(SNAPSHOTDIR) ## Build release snapshot binaries and packages

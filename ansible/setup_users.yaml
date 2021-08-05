@@ -1,0 +1,117 @@
+---
+  - name: Playing with Ansible and Git
+    hosts: localhost
+    vars:
+      - deptrack_base_url: http://localhost:8081
+      - deptrack_url: "{{ deptrack_base_url }}/api/v1"
+    connection: local 
+    tasks:
+
+    - name: "wait for api service to come up"
+      uri:
+        url: "{{ deptrack_base_url }}/version"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 60
+      delay: 1
+
+    - name: Change default password
+      uri:
+        url: "{{ deptrack_url }}/user/forceChangePassword"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: admin
+          password: admin
+          newPassword: KeepCalm!
+          confirmPassword: KeepCalm!
+        status_code: 200
+      failed_when: false
+
+    - name: Login default password
+      uri:
+        url: "{{ deptrack_url }}/user/login"
+        method: POST
+        body_format: form-urlencoded
+        follow_redirects: yes
+        return_content: yes
+        body:
+          username: admin
+          password: KeepCalm!
+        status_code: 200
+      register: login
+
+    # - debug:
+    #     msg: "login {{ login }}"
+
+    - name: Get teams
+      uri:
+        url: "{{ deptrack_url }}/team"
+        method: GET
+        return_content: yes
+        headers:
+          Authorization: "Bearer {{login.content}}"
+      register: all_teams
+
+    # - debug:
+    #     msg: "all_teams {{ all_teams }}"
+
+    - name: Search scribe backend team
+      set_fact:
+        scribe_team: "{{ item }}"
+      loop: "{{ all_teams.json }}"
+      when: item.name == 'Scribe_backend' and scribe_team is undefined
+
+    # - debug:
+    #     msg: "scribe_team_found {{ scribe_team.uuid }}"
+    #   when: scribe_team is defined
+
+    # - debug:
+    #     msg: "scribe_team_found Not found"
+    #   when: scribe_team is undefined
+
+
+    - name: Create new scribe team
+      uri:
+        url: "{{ deptrack_url }}/team"
+        method: PUT
+        body_format: json
+        return_content: yes
+        body:
+          name: Scribe_backend
+        headers:
+          Authorization: "Bearer {{login.content}}"
+        status_code: 201
+      register: scribe_team_new
+      when: scribe_team is undefined
+
+    - name: Set scribe team
+      set_fact:
+        scribe_team: "{{ scribe_team_new.content }}"
+      when: scribe_team_new.content is defined
+
+    - debug:
+        msg: "scribe_team {{ scribe_team }}"
+      when: scribe_team is defined
+
+    - name: Add permissions
+      uri:
+        url: "{{ deptrack_url }}/permission/{{ item }}/team/{{ scribe_team.uuid }}"
+        method: POST
+        body_format: json
+        return_content: yes
+        headers:
+          Authorization: "Bearer {{login.content}}"
+      when: scribe_team is defined
+      with_items:
+      - BOM_UPLOAD
+      - PROJECT_CREATION_UPLOAD
+      - VIEW_PORTFOLIO
+      failed_when: false
+
+    - name: Copying scirbe backend api key to file
+      copy:
+        content: "export API_KEY={{ scribe_team.apiKeys[0].key }}"
+        dest: "scribe_backend_api_key"
+      when: scribe_team is defined
