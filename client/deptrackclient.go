@@ -3,11 +3,7 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
 	"io/ioutil"
-	"mime/multipart"
-	"net/textproto"
 	"net/url"
 	"strings"
 
@@ -93,22 +89,6 @@ func (depClient *DepTrackClient) GetJsonList(api string) (JSON_LIST, error) {
 
 func (depClient *DepTrackClient) GetTeam() (JSON_LIST, error) {
 	return depClient.GetJsonList("team")
-}
-
-func (depClient *DepTrackClient) MultipartWriter(api string, filename string, params map[string]string, w io.Writer) (*multipart.Writer, io.Writer, error) {
-	multipart_writer := multipart.NewWriter(w)
-
-	for key, val := range params {
-		_ = multipart_writer.WriteField(key, val)
-	}
-
-	partHeaders := textproto.MIMEHeader{}
-	partHeaders.Set("Content-Disposition",
-		fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
-			escapeQuotes(api), escapeQuotes(filename)))
-	partHeaders.Set("Content-Type", "application/octet-stream")
-	writer, err := multipart_writer.CreatePart(partHeaders)
-	return multipart_writer, writer, err
 }
 
 func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackSbomPost, bom *cdx.BOM, response *DepTrackSbomPostResponse) error {

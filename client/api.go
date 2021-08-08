@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"path"
 	"strings"
 	"time"
@@ -208,4 +210,20 @@ func (c *ApiClient) sendRequest(req *http.Request, Content_type string) (*http.R
 	log.Infof("Api client - Post URL: %s,  Status: %d, Text: %s", req.URL, res.StatusCode, http.StatusText(res.StatusCode))
 
 	return res, nil
+}
+
+func (c *ApiClient) MultipartWriter(api string, filename string, params map[string]string, w io.Writer) (*multipart.Writer, io.Writer, error) {
+	multipart_writer := multipart.NewWriter(w)
+
+	for key, val := range params {
+		_ = multipart_writer.WriteField(key, val)
+	}
+
+	partHeaders := textproto.MIMEHeader{}
+	partHeaders.Set("Content-Disposition",
+		fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+			escapeQuotes(api), escapeQuotes(filename)))
+	partHeaders.Set("Content-Type", "application/octet-stream")
+	writer, err := multipart_writer.CreatePart(partHeaders)
+	return multipart_writer, writer, err
 }
