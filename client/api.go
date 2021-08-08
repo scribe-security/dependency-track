@@ -96,13 +96,23 @@ func (c *ApiClient) sendRequestJson(req *http.Request, response interface{}) err
 	if err != nil {
 		return err
 	}
-	// if response != nil {
-	// 	if err = json.NewDecoder(resp.Body).Decode(&response); err != nil {
-	// 		return err
-	// 	}
-
-	// }
 	return nil
+}
+
+func (c *ApiClient) PostMultipart(api string, body io.Reader) (*http.Response, error) {
+	req, err := c.NewRequest("POST", api, body)
+	if err != nil {
+		return nil, err
+	}
+	return c.sendRequest(req, "multipart/form-data")
+}
+
+func (c *ApiClient) PostJson(api string, body io.Reader, response interface{}) error {
+	req, err := c.NewRequest("POST", api, body)
+	if err != nil {
+		return err
+	}
+	return c.sendRequestJson(req, response)
 }
 
 func (c *ApiClient) Post(api, contentType string, body io.Reader) (resp *http.Response, err error) {

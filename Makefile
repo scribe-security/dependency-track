@@ -77,6 +77,11 @@ tail-local: ## Tail service logs (docker-compose)
 setup-users: ## Setup initial users and teams
 	@ansible-playbook ansible/setup_users.yaml --ask-vault-pass
 
+.PHONY: integration
+integration: ## Run integration tests
+	$(call title,Running integration tests)
+	go test -v ./test/integration
+
 # .PHONY: build
 # build: $(SNAPSHOTDIR) ## Build release snapshot binaries and packages
 

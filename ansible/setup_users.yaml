@@ -13,7 +13,7 @@
           61316665616636626235363038366162633433643764393435616462646333343866
     connection: local 
     tasks:
-      
+
     - debug:
         var: default_admin_pass
 
@@ -118,6 +118,12 @@
       - BOM_UPLOAD
       - PROJECT_CREATION_UPLOAD
       - VIEW_PORTFOLIO
+      - ACCESS_MANAGEMENT
+      - POLICY_MANAGEMENT
+      - POLICY_VIOLATION_ANALYSIS
+      - PORTFOLIO_MANAGEMENT
+      - SYSTEM_CONFIGURATION
+      - VULNERABILITY_ANALYSIS
       failed_when: false
 
     - name: Copying scirbe backend api key to file

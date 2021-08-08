@@ -25,6 +25,7 @@ services:
   dtrack-apiserver:
     image: dependencytrack/apiserver
     environment:
+    - LOGGING_LEVEL=TRACE
     # The Dependency-Track container can be configured using any of the
     # available configuration properties defined in:
     # https://docs.dependencytrack.org/getting-started/configuration/
