@@ -8,10 +8,11 @@ version: '3.7'
 
 volumes:
   dependency-track:
-  postgres:
+  dtrack_postgres:
+  client_postgres:
 
 services:
-  db:
+  dtrack_db:
     environment:
     - POSTGRES_USER=dtrack
     - POSTGRES_PASSWORD=dtrack
@@ -19,8 +20,17 @@ services:
     ports:
       - "15432:5432"
     volumes:
-    - postgres:/data/postgres
-    # - './postgres-data:/var/lib/postgresql/data'
+    - dtrack_postgres:/data/postgres
+
+  client_db:
+    environment:
+    - POSTGRES_USER=client
+    - POSTGRES_PASSWORD=client
+    image: 'postgres'
+    ports:
+      - "25432:5432"
+    volumes:
+    - client_postgres:/data/postgres
 
   dtrack-apiserver:
     image: dependencytrack/apiserver
@@ -33,7 +43,7 @@ services:
     #
     # Database Properties
     - ALPINE_DATABASE_MODE=external
-    - ALPINE_DATABASE_URL=jdbc:postgresql://db:5432/dtrack
+    - ALPINE_DATABASE_URL=jdbc:postgresql://dtrack_db:5432/dtrack
     - ALPINE_DATABASE_DRIVER=org.postgresql.Driver
     - ALPINE_DATABASE_USERNAME=dtrack
     - ALPINE_DATABASE_PASSWORD=dtrack
@@ -97,7 +107,7 @@ services:
       - 'dependency-track:/data'
     restart: unless-stopped
     depends_on:
-      - db
+      - dtrack_db
 
   dtrack-frontend:
     image: dependencytrack/frontend

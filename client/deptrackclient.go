@@ -35,6 +35,7 @@ type DepTrackSbomPost struct {
 
 type DepTrackSbomPostResponse struct {
 	Token string `json:"token"`
+	Test  string
 }
 
 type DepTrackClient struct {

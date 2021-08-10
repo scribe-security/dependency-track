@@ -67,7 +67,7 @@ attach-local: ## Attach to api image - drop to shell (docker-compose)
 
 .PHONY: attach-log-local
 attach-log-local: ## Attach to api log (docker-compose)
-	@docker attach -p ${PROJECT}  -f $(DOCKER_COMPOSE) ${PROJECT}_dtrack-apiserver_1
+	@docker attach -f $(DOCKER_COMPOSE) ${PROJECT}_dtrack-apiserver_1
 
 .PHONY: tail
 tail-local: ## Tail service logs (docker-compose)
