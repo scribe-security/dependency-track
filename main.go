@@ -103,37 +103,65 @@ func PostSbom(name string, c *client.DepTrackClient, bom *cdx.BOM) *client.DepTr
 }
 
 func main() {
-	// Init db
-	db := Connect()
-	db.AutoMigrate(&models.SbomRequest{})
-	sqldb, err := db.DB()
-	if err != nil {
-		panic(err)
-	}
-	defer sqldb.Close()
-	init_db(db)
 
+	api_key := "AwMZwGPcEngrwrS9PBbpEk68q3D5MhmP"
+	purl := "pkg:pypi/argparse@1.2.1"
 	// Init managers
-	c := initClient()
-	cyclonedx_manager := initCycloneDxManager()
-
-	// Read sbom from file
-	bom, name := ReadSbom(cyclonedx_manager)
-
-	// Post sbom to dep track - receive reponse
-	sbom_response := PostSbom(name, c, bom)
-
-	// Save data to DB
-	sbom_req := models.SbomRequest{Status: "Pending", DepTrackSbomPostResponse: *sbom_response}
-	err = models.CreateSbomRequest(&sbom_req)
-	if err != nil {
-		panic(err)
-	}
-	var find_SbomRequest models.SbomRequest
-	err = models.GetSbomRequest(&find_SbomRequest, 1)
+	client, err := client.NewDepTrackClient(api_key)
 	if err != nil {
 		panic(err)
 	}
 
-	fmt.Printf("FOUND: %+v\n", find_SbomRequest.DepTrackSbomPostResponse.Token)
+	component, err := client.GetComponentByPURL(purl)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(component)
+
+	latest, err := client.GetRepositoryLatest(purl)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(latest)
+	// latesta, currentVersion, err := client.GetLatestVersion(purl)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// fmt.Println(latesta, currentVersion)
+
+	// // Init db
+	// db := Connect()
+	// db.AutoMigrate(&models.SbomRequest{})
+	// sqldb, err := db.DB()
+	// if err != nil {
+	//      panic(err)
+	// }
+	// defer sqldb.Close()
+	// init_db(db)
+
+	// // Init managers
+	// c := initClient()
+	// cyclonedx_manager := initCycloneDxManager()
+
+	// // Read sbom from file
+	// bom, name := ReadSbom(cyclonedx_manager)
+
+	// // Post sbom to dep track - receive reponse
+	// sbom_response := PostSbom(name, c, bom)
+
+	// // Save data to DB
+	// sbom_req := models.SbomRequest{Status: "Pending", DepTrackSbomPostResponse: *sbom_response}
+	// err = models.CreateSbomRequest(&sbom_req)
+	// if err != nil {
+	//      panic(err)
+	// }
+	// var find_SbomRequest models.SbomRequest
+	// err = models.GetSbomRequest(&find_SbomRequest, 1)
+	// if err != nil {
+	//      panic(err)
+	// }
+
+	// fmt.Printf("FOUND: %+v\n", find_SbomRequest.DepTrackSbomPostResponse.Token)
+
 }

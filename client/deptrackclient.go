@@ -3,10 +3,8 @@ package client
 import (
 	"bytes"
 	"encoding/json"
-<<<<<<< Updated upstream
-=======
+
 	"fmt"
->>>>>>> Stashed changes
 	"io/ioutil"
 	"net/url"
 	"strings"
@@ -17,6 +15,24 @@ import (
 
 type JSON map[string]interface{}
 type JSON_LIST []map[string]interface{}
+
+type References []string
+
+type PurlQualifiers struct {
+	AdditionalProp1 string `json:"additionalProp1,omitempty"`
+	AdditionalProp2 string `json:"additionalProp2,omitempty"`
+	AdditionalProp3 string `json:"additionalProp3,omitempty"`
+}
+
+type Purl struct {
+	Scheme     string         `json:"scheme,omitempty"`
+	Type       string         `json:"type,omitempty"`
+	Namespace  string         `json:"namespace,omitempty"`
+	Name       string         `json:"name,omitempty"`
+	Version    string         `json:"version,omitempty"`
+	Qualifiers PurlQualifiers `json:"qualifiers,omitempty"`
+	Subpath    string         `json:"subpath,omitempty"`
+}
 
 type DepTrackPermission struct {
 	Name        string `json:"name"`
@@ -37,8 +53,6 @@ type DepTrackSbomPost struct {
 	ProjectVersion string `json:"projectVersion,omitempty"`
 }
 
-<<<<<<< Updated upstream
-=======
 type LatestVersionParams struct {
 	Purl string `json:"purl,omitempty"`
 }
@@ -56,12 +70,10 @@ type LatestVersionResponse struct {
 	Namespace      string `json:"namespace,omitempty"`
 	Name           string `json:"name,omitempty"`
 	LatestVersion  string `json:"latestVersion,omitempty"`
-	// TBD: Add support to time parsing
 	// Published      time.Time `json:"published,omitempty"`
 	// LastCheck      time.Time `json:"lastCheck,omitempty"`
 }
 
->>>>>>> Stashed changes
 type DepTrackSbomPostResponse struct {
 	Token string `json:"token"`
 	Test  string
@@ -73,11 +85,8 @@ type DepTrackClient struct {
 	accessToken string
 }
 
-<<<<<<< Updated upstream
-=======
 type Cwe struct {
-	cweId int    `json:"vulnId,omitempty"`
-	name  string `json:"name,omitempty"`
+	cweId int `json:"vulnId,omitempty"`
 }
 
 type Vulnraibility struct {
@@ -116,16 +125,9 @@ type VulnraibilityList []Vulnraibility
 const GetAllVulnerabilities string = "/vulnerability/component"
 const GetAllComponent string = "/component/identity"
 
->>>>>>> Stashed changes
-var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
-
-func escapeQuotes(s string) string {
-	return quoteEscaper.Replace(s)
-}
-
 func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
 	cfg := ServiceCfg{ApiToken: access_token, Url: "http://localhost:8081/api/v1", Enable: true}
-	client, err := NewApiClient(&cfg)
+	client, err := NewApiClient(&cfg, false, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -204,8 +206,6 @@ func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackS
 
 	return err
 }
-<<<<<<< Updated upstream
-=======
 
 func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*LatestVersionResponse, error) {
 	const LatestApiPath string = "/repository/latest"
@@ -251,17 +251,3 @@ func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, i
 
 	return vulnraibilityList, nil
 }
-
-func (depClient *DepTrackClient) GetLatestVersion(PURL string) (float64, float64, error) {
-
-	latest, err := depClient.GetRepositoryLatest(PURL)
-	if err != nil {
-		return 0, 0, err
-	}
-	LatestVersion := latest.LatestVersion
-	PURL.
-		purl = NewPurl(PURL)
-	resp = GetRepositoryLatest(purl.raw)
-	return purl.version, LatestVersion
-}
->>>>>>> Stashed changes
