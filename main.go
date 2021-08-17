@@ -124,11 +124,11 @@ func main() {
 	}
 
 	fmt.Println(latest)
-	// latesta , currentVersion, err := client.GetLatestVersion(purl)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Println(latesta, currentVersion)
+	latesta, currentVersion, err := client.GetLatestVersion(purl)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(latesta, currentVersion)
 
 	// // Init db
 	// db := Connect()

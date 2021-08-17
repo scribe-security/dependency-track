@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
+	packageurl "github.com/package-url/packageurl-go"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -65,7 +66,7 @@ type GetVulnerabilityByUUIDParams struct {
 	Suppressed bool `json:"suppressed,omitempty"`
 }
 
-type LatestVersionResponse struct {
+type VersionResponse struct {
 	RepositoryType string `json:"repositoryType,omitempty"`
 	Namespace      string `json:"namespace,omitempty"`
 	Name           string `json:"name,omitempty"`
@@ -207,9 +208,9 @@ func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackS
 	return err
 }
 
-func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*LatestVersionResponse, error) {
+func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionResponse, error) {
 	const LatestApiPath string = "/repository/latest"
-	var latestVersion LatestVersionResponse
+	var latestVersion VersionResponse
 	params := LatestVersionParams{Purl: PURL}
 
 	err := depClient.GetJsonWithParams(LatestApiPath, params, &latestVersion)
@@ -250,4 +251,40 @@ func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, i
 	}
 
 	return vulnraibilityList, nil
+}
+
+func (depClient *DepTrackClient) GetLatestVersion(PURL string) (*packageurl.PackageURL, *packageurl.PackageURL, bool, error) {
+	latest_version_response, err := depClient.GetRepositoryLatest(PURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	parsed_purl, err := packageurl.FromString(PURL)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	latest_parsed_purl, _ := depClient.LatestToPurl(parsed_purl, latest_version_response)
+
+	if !CmpPurl(&parsed_purl, latest_parsed_purl) {
+		fmt.Printf("depclient - PURL purl missmatch with latest, %s != %s\n", parsed_purl.ToString(), latest_parsed_purl.ToString())
+	} else {
+		fmt.Printf("depclient - PURL purl match with latest, %s != %s\n", parsed_purl.ToString(), latest_parsed_purl.ToString())
+
+	}
+
+	return latest_parsed_purl, &parsed_purl, CmpPurl(&parsed_purl, latest_parsed_purl), err
+}
+
+func (depClient *DepTrackClient) LatestToPurl(base packageurl.PackageURL, resp *VersionResponse) (*packageurl.PackageURL, error) {
+	new_purl := packageurl.NewPackageURL(strings.ToLower(resp.RepositoryType), resp.Namespace, resp.Name, resp.LatestVersion, base.Qualifiers, base.Subpath)
+	normlized_new_purl, err := packageurl.FromString(new_purl.ToString())
+	if err != nil {
+		return nil, err
+	}
+	return &normlized_new_purl, nil
+}
+
+func CmpPurl(a *packageurl.PackageURL, b *packageurl.PackageURL) bool {
+	return a.ToString() == b.ToString()
 }
