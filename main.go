@@ -103,7 +103,7 @@ func PostSbom(name string, c *client.DepTrackClient, bom *cdx.BOM) *client.DepTr
 }
 
 func main() {
-
+	// Test keys
 	api_key := "AwMZwGPcEngrwrS9PBbpEk68q3D5MhmP"
 	purl := "pkg:pypi/argparse@1.2.1"
 	// Init managers
@@ -124,7 +124,7 @@ func main() {
 	}
 
 	fmt.Println(latest)
-	// latesta, currentVersion, err := client.GetLatestVersion(purl)
+	// latesta , currentVersion, err := client.GetLatestVersion(purl)
 	// if err != nil {
 	// 	panic(err)
 	// }
