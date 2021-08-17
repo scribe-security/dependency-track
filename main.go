@@ -106,13 +106,14 @@ func main() {
 	// Test keys
 	api_key := "AwMZwGPcEngrwrS9PBbpEk68q3D5MhmP"
 	purl := "pkg:pypi/argparse@1.2.1"
+	purl_with_cves := "pkg:deb/debian/git@1%3A2.20.1-2%20deb10u3?arch=amd64"
 	// Init managers
 	client, err := client.NewDepTrackClient(api_key)
 	if err != nil {
 		panic(err)
 	}
 
-	component, err := client.GetComponentByPURL(purl)
+	component, err := client.GetComponentsByPURL(purl)
 	if err != nil {
 		panic(err)
 	}
@@ -124,11 +125,17 @@ func main() {
 	}
 
 	fmt.Println(latest)
-	latesta, currentVersion, err := client.GetLatestVersion(purl)
+	latestVersion, currentVersion, isVersionEquel, err := client.GetLatestVersion(purl)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(latesta, currentVersion)
+	fmt.Println(latestVersion, currentVersion, isVersionEquel)
+
+	cveList, err := client.GetCVEList(purl_with_cves)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(cveList, currentVersion)
 
 	// // Init db
 	// db := Connect()

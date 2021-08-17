@@ -58,7 +58,7 @@ type LatestVersionParams struct {
 	Purl string `json:"purl,omitempty"`
 }
 
-type GetComponentByPurlParams struct {
+type GetComponentsByPURLParams struct {
 	Purl string `json:"purl,omitempty"`
 }
 
@@ -221,9 +221,9 @@ func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionRespo
 	return &latestVersion, nil
 }
 
-func (depClient *DepTrackClient) GetComponentByPURL(PURL string) (ComponentList, error) {
+func (depClient *DepTrackClient) GetComponentsByPURL(PURL string) (ComponentList, error) {
 	var component_list ComponentList
-	params := GetComponentByPurlParams{Purl: PURL}
+	params := GetComponentsByPURLParams{Purl: PURL}
 
 	if err := depClient.GetJsonWithParams(GetAllComponent, params, &component_list); err != nil {
 		return nil, err
@@ -256,12 +256,12 @@ func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, i
 func (depClient *DepTrackClient) GetLatestVersion(PURL string) (*packageurl.PackageURL, *packageurl.PackageURL, bool, error) {
 	latest_version_response, err := depClient.GetRepositoryLatest(PURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
 	parsed_purl, err := packageurl.FromString(PURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, false, err
 	}
 
 	latest_parsed_purl, _ := depClient.LatestToPurl(parsed_purl, latest_version_response)
@@ -287,4 +287,23 @@ func (depClient *DepTrackClient) LatestToPurl(base packageurl.PackageURL, resp *
 
 func CmpPurl(a *packageurl.PackageURL, b *packageurl.PackageURL) bool {
 	return a.ToString() == b.ToString()
+}
+
+func (depClient *DepTrackClient) GetCVEList(PURL string) (VulnraibilityList, error) {
+	component_list, err := depClient.GetComponentsByPURL(PURL)
+	var finalList VulnraibilityList
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(component_list, err)
+	for _, componenet := range component_list {
+		fmt.Println(componenet.UUID, err)
+		vulnraibility_list, err := depClient.GetVulnerabilityComponenetByUUID(componenet.UUID, true)
+		if err != nil {
+			return nil, err
+		}
+		finalList = append(finalList, vulnraibility_list...)
+	}
+
+	return finalList, err
 }
