@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 
-	"fmt"
 	"io/ioutil"
 	"net/url"
 	"strings"
@@ -103,6 +102,9 @@ type Vulnraibility struct {
 	//Published       string  `json:"published,omitempty"`
 	//Updated         time.Time `json:"updated,omitempty"`
 }
+type SbomProcessingState struct {
+	processing bool `json:"processing,omitempty"`
+}
 
 type Component struct {
 	Author    string `json:"author,omitempty"`
@@ -120,6 +122,18 @@ type Component struct {
 	UUID      string `json:"uuid,omitempty"`
 }
 
+type PurlVersionStruct struct {
+	CurrentVersion *packageurl.PackageURL
+	LatestVersion  *packageurl.PackageURL
+	isVersionEquel bool
+}
+
+type VulnraibilityListStruct struct {
+	VulnraibilityList VulnraibilityList
+}
+
+type VulnraibilityListMap map[string]VulnraibilityListStruct
+type PurlVersionStructMap map[string]PurlVersionStruct
 type ComponentList []Component
 type VulnraibilityList []Vulnraibility
 
@@ -149,6 +163,9 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 	defer resp.Body.Close()
 
 	login_response_bytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
 
 	log.Info("Access token: ", string(login_response_bytes))
 	depClient.Cfg.Token = string(login_response_bytes)
@@ -168,9 +185,23 @@ func (depClient *DepTrackClient) GetTeam() (JSON_LIST, error) {
 	return depClient.GetJsonList("team")
 }
 
+func (depClient *DepTrackClient) removeComponents(bom *cdx.BOM) {
+	var filtered_componenets []cdx.Component
+	for _, component := range *bom.Components {
+		if component.Type != "file" {
+			filtered_componenets = append(filtered_componenets, component)
+		}
+	}
+	bom.Components = &filtered_componenets
+}
+
 func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackSbomPost, bom *cdx.BOM, response *DepTrackSbomPostResponse) error {
+	depClient.removeComponents(bom)
+
 	buf := new(bytes.Buffer)
 
+	// 2DO removing FILE and DEP graphs (to much work for deptrack)
+	bom.Dependencies = nil
 	var extraParams map[string]string
 	v, err := json.Marshal(deptrack_params)
 	if err != nil {
@@ -209,11 +240,10 @@ func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackS
 }
 
 func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionResponse, error) {
-	const LatestApiPath string = "/repository/latest"
 	var latestVersion VersionResponse
 	params := LatestVersionParams{Purl: PURL}
 
-	err := depClient.GetJsonWithParams(LatestApiPath, params, &latestVersion)
+	err := depClient.GetJsonWithParams("/repository/latest", params, &latestVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -229,25 +259,16 @@ func (depClient *DepTrackClient) GetComponentsByPURL(PURL string) (ComponentList
 		return nil, err
 	}
 
-	for _, com := range component_list {
-		fmt.Printf("%+v\n", com)
-	}
-
 	return component_list, nil
 }
 
 func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, isSupported bool) (VulnraibilityList, error) {
 
 	var vulnraibilityList VulnraibilityList
-	//params := GetVulnerabilityByUUIDParams{Suppressed: true}
 	FullVulnrabilityPath := GetAllVulnerabilities + "/" + uuid
 
 	if err := depClient.GetJson(FullVulnrabilityPath, &vulnraibilityList); err != nil {
 		return nil, err
-	}
-
-	for _, com := range vulnraibilityList {
-		fmt.Printf("%+v\n", com)
 	}
 
 	return vulnraibilityList, nil
@@ -266,13 +287,6 @@ func (depClient *DepTrackClient) GetLatestVersion(PURL string) (*packageurl.Pack
 
 	latest_parsed_purl, _ := depClient.LatestToPurl(parsed_purl, latest_version_response)
 
-	if !CmpPurl(&parsed_purl, latest_parsed_purl) {
-		fmt.Printf("depclient - PURL purl missmatch with latest, %s != %s\n", parsed_purl.ToString(), latest_parsed_purl.ToString())
-	} else {
-		fmt.Printf("depclient - PURL purl match with latest, %s != %s\n", parsed_purl.ToString(), latest_parsed_purl.ToString())
-
-	}
-
 	return latest_parsed_purl, &parsed_purl, CmpPurl(&parsed_purl, latest_parsed_purl), err
 }
 
@@ -289,21 +303,79 @@ func CmpPurl(a *packageurl.PackageURL, b *packageurl.PackageURL) bool {
 	return a.ToString() == b.ToString()
 }
 
-func (depClient *DepTrackClient) GetCVEList(PURL string) (VulnraibilityList, error) {
+func (depClient *DepTrackClient) GetVulnraibilityList(PURL string) (VulnraibilityList, error) {
 	component_list, err := depClient.GetComponentsByPURL(PURL)
-	var finalList VulnraibilityList
+	var final_vulnraibility_list VulnraibilityList
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(component_list, err)
 	for _, componenet := range component_list {
-		fmt.Println(componenet.UUID, err)
 		vulnraibility_list, err := depClient.GetVulnerabilityComponenetByUUID(componenet.UUID, true)
 		if err != nil {
 			return nil, err
 		}
-		finalList = append(finalList, vulnraibility_list...)
+		final_vulnraibility_list = append(final_vulnraibility_list, vulnraibility_list...)
 	}
 
-	return finalList, err
+	return final_vulnraibility_list, err
+}
+
+func (depClient *DepTrackClient) GetLatestVersionBySbom(bom *cdx.BOM) (PurlVersionStructMap, error) {
+	components_map := make(PurlVersionStructMap)
+
+	for _, component := range *bom.Components {
+
+		if component.Type != "library" {
+			continue
+		}
+		if component.PackageURL == "" {
+			log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+			continue
+		}
+		current_version, latest_version, is_version_equel, err := depClient.GetLatestVersion(component.PackageURL)
+		if err != nil {
+			log.Debugf("Get Latest version error skipping, Purl: %s Err: %+v", component.PackageURL, err)
+			continue
+		}
+		components_map[component.Name] = PurlVersionStruct{current_version, latest_version, is_version_equel}
+	}
+
+	return components_map, nil
+}
+
+func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (VulnraibilityListMap, error) {
+	components_map := make(VulnraibilityListMap)
+
+	for _, component := range *bom.Components {
+		if component.Type != "library" {
+			continue
+		}
+
+		if component.PackageURL == "" {
+			log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+			continue
+		}
+		vulnraibility_list, err := depClient.GetVulnraibilityList(component.PackageURL)
+		if err != nil {
+			log.Debugf("Get vulnraibility error skipping, Purl: %s Err: %+v", component.PackageURL, err)
+			return nil, err
+		}
+		if len(vulnraibility_list) == 0 {
+			continue
+		}
+		components_map[component.Name] = VulnraibilityListStruct{vulnraibility_list}
+	}
+
+	return components_map, nil
+}
+
+func (depClient *DepTrackClient) IsSbomFinishedToUpload(sbom_uuid string) (bool, error) {
+	var sbomProcessingState SbomProcessingState
+	sbom_token_query := "/bom/token/" + sbom_uuid
+
+	if err := depClient.GetJson(sbom_token_query, &sbomProcessingState); err != nil {
+		return false, err
+	}
+	// If still processing return the false
+	return !sbomProcessingState.processing, nil
 }

@@ -306,10 +306,10 @@ func (c *ApiClient) SendRequest(req *http.Request, Content_type string) (*http.R
 	}
 
 	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
-		return nil, fmt.Errorf("Api client - response, url: %s, status_code: %d, Text: %s", req.URL, res.StatusCode, http.StatusText(res.StatusCode))
+		return nil, fmt.Errorf("api client - response, url: %s, status_code: %d, Text: %s", req.URL, res.StatusCode, http.StatusText(res.StatusCode))
 	}
 
-	c.Log.Infof("Api client - Post URL: %s,  Status: %d, Text: %s", req.URL, res.StatusCode, http.StatusText(res.StatusCode))
+	c.Log.Debugf("Api client - Post URL: %s,  Status: %d, Text: %s", req.URL, res.StatusCode, http.StatusText(res.StatusCode))
 
 	return res, nil
 }
