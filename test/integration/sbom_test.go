@@ -16,7 +16,9 @@ import (
 	"gotest.tools/assert"
 )
 
-const SbomLocalPath string = "test/integration/test-fixtures/sbom/python.sbom.json"
+func UNUSED(x ...interface{}) {}
+
+const SbomLocalPath string = "test-fixtures/sbom/python.sbom.json"
 
 func Connect() *gorm.DB {
 	dsn := url.URL{
@@ -179,9 +181,16 @@ func TestCycloneDxPost(t *testing.T) {
 }
 
 func TestPostSbomAndCheck(t *testing.T) {
+	tests := []struct {
+		Test_Purl_Name           string
+		Test_Purl_Name_With_Cves string
+	}{
+		{
+			Test_Purl_Name:           "pkg:pypi/argparse@1.2.1",
+			Test_Purl_Name_With_Cves: "pkg:deb/debian/git@1%3A2.20.1-2%20deb10u3?arch=amd64",
+		},
+	}
 
-	api_key := "nssq2LQPmGBoWH8ixGwPhWdblxwcECZH"
-	os.Setenv("API_KEY", api_key)
 	// Init managers
 	client := initClient()
 	cyclonedx_manager := initCycloneDxManager()
@@ -196,6 +205,44 @@ func TestPostSbomAndCheck(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(sbom_response)
-	fmt.Println(is_finish_upload)
+	t.Log(is_finish_upload)
+	for _, test := range tests {
+
+		component, err := client.GetComponentsByPURL(test.Test_Purl_Name)
+		if err != nil {
+			panic(err)
+		}
+		t.Log(component)
+
+		latest, err := client.GetRepositoryLatest(test.Test_Purl_Name)
+		if err != nil {
+			panic(err)
+		}
+
+		t.Log(latest)
+		latestVersion, currentVersion, isVersionEquel, err := client.GetLatestVersion(test.Test_Purl_Name)
+		if err != nil {
+			panic(err)
+		}
+		t.Log(latestVersion, currentVersion, isVersionEquel)
+
+		vulnraibilityList, err := client.GetVulnraibilityList(test.Test_Purl_Name_With_Cves)
+		if err != nil {
+			panic(err)
+		}
+		t.Log(vulnraibilityList, currentVersion)
+
+		LatestVersionOfSbom, err := client.GetLatestVersionBySbom(bom)
+		if err != nil {
+			panic(err)
+		}
+		t.Log(LatestVersionOfSbom, name)
+
+		client.GetVulnraibilityListBySbom(bom)
+		vulnraibilityListOfSbom, err := client.GetVulnraibilityListBySbom(bom)
+		if err != nil {
+			panic(err)
+		}
+		t.Log(vulnraibilityListOfSbom)
+	}
 }
