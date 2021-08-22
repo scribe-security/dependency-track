@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
+	retry "github.com/avast/retry-go"
 	packageurl "github.com/package-url/packageurl-go"
 	log "github.com/sirupsen/logrus"
 )
@@ -70,8 +71,6 @@ type VersionResponse struct {
 	Namespace      string `json:"namespace,omitempty"`
 	Name           string `json:"name,omitempty"`
 	LatestVersion  string `json:"latestVersion,omitempty"`
-	// Published      time.Time `json:"published,omitempty"`
-	// LastCheck      time.Time `json:"lastCheck,omitempty"`
 }
 
 type DepTrackSbomPostResponse struct {
@@ -139,9 +138,13 @@ type VulnraibilityList []Vulnraibility
 
 const GetAllVulnerabilities string = "/vulnerability/component"
 const GetAllComponent string = "/component/identity"
+const SbomTokenQuery string = "/bom/token/"
+const GetRepositoryLatest string = "/repository/latest"
+const UserLoginPath = "user/login"
+const ApiServerPath = "http://localhost:8081/api/v1"
 
 func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
-	cfg := ServiceCfg{ApiToken: access_token, Url: "http://localhost:8081/api/v1", Enable: true}
+	cfg := ServiceCfg{ApiToken: access_token, Url: ApiServerPath, Enable: true}
 	client, err := NewApiClient(&cfg, false, 0)
 	if err != nil {
 		return nil, err
@@ -156,7 +159,7 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 		"password": {password}, //Read from env DEPEND_TRACK_PASS
 	}
 
-	resp, err := depClient.Post("user/login", "application/x-www-form-urlencoded", strings.NewReader(login_values.Encode()))
+	resp, err := depClient.Post(UserLoginPath, "application/x-www-form-urlencoded", strings.NewReader(login_values.Encode()))
 	if err != nil {
 		return err
 	}
@@ -243,7 +246,7 @@ func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionRespo
 	var latestVersion VersionResponse
 	params := LatestVersionParams{Purl: PURL}
 
-	err := depClient.GetJsonWithParams("/repository/latest", params, &latestVersion)
+	err := depClient.GetJsonWithParams(GetRepositoryLatest, params, &latestVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -369,13 +372,33 @@ func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (Vulnr
 	return components_map, nil
 }
 
-func (depClient *DepTrackClient) IsSbomFinishedToUpload(sbom_uuid string) (bool, error) {
+func (depClient *DepTrackClient) GetSbomDetails(sbom_uuid string) (bool, error) {
 	var sbomProcessingState SbomProcessingState
-	sbom_token_query := "/bom/token/" + sbom_uuid
+	sbom_token_query := SbomTokenQuery + sbom_uuid
 
 	if err := depClient.GetJson(sbom_token_query, &sbomProcessingState); err != nil {
 		return false, err
 	}
-	// If still processing return the false
-	return !sbomProcessingState.processing, nil
+
+	return sbomProcessingState.processing, nil
+}
+
+func (depClient *DepTrackClient) WaitforSbomFinishUpload(sbom_uuid string) (bool, error) {
+	err := retry.Do(
+		func() error {
+			is_finished, err := depClient.GetSbomDetails(sbom_uuid)
+			if err != nil {
+				log.Error("GetSbomDetails failed")
+			}
+			if !is_finished {
+				return nil
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	// If not processing return true
+	return true, nil
 }
