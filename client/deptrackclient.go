@@ -3,6 +3,8 @@ package client
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"time"
 
 	"io/ioutil"
 	"net/url"
@@ -58,8 +60,23 @@ type LatestVersionParams struct {
 	Purl string `json:"purl,omitempty"`
 }
 
-type GetComponentsByPURLParams struct {
-	Purl string `json:"purl,omitempty"`
+type GetProjectLookupParams struct {
+	Name    string `json:"name,omitempty"`
+	Version string `json:"version,omitempty"`
+}
+
+type GetProjectParams struct {
+	Name string `json:"name,omitempty"`
+}
+
+type GetComponentsIdentityParams struct {
+	Group     string `json:"group,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Purl      string `json:"purl,omitempty"`
+	Cpe       string `json:"cpe,omitempty"`
+	SwidTagId string `json:"swidTagId,omitempty"`
+	PaginationParams
 }
 
 type GetVulnerabilityByUUIDParams struct {
@@ -102,7 +119,12 @@ type Vulnraibility struct {
 	//Updated         time.Time `json:"updated,omitempty"`
 }
 type SbomProcessingState struct {
-	processing bool `json:"processing,omitempty"`
+	Processing bool `json:"processing,omitempty"`
+}
+
+type PaginationParams struct {
+	Offset string `json:"offset,omitempty"`
+	Limit  string `json:"limit,omitempty"`
 }
 
 type Component struct {
@@ -121,27 +143,47 @@ type Component struct {
 	UUID      string `json:"uuid,omitempty"`
 }
 
+type Project struct {
+	Name                   string       `json:"name,omitempty"`
+	UUID                   string       `json:"uuid,omitempty"`
+	LastInheritedRiskScore float64      `json:"lastInheritedRiskScore,omitempty"`
+	LastBomImportFormat    string       `json:"lastBomImportFormat,omitempty"`
+	Active                 bool         `json:"active,omitempty"`
+	Metrics                Metrics_stat `json:"metrics,omitempty"`
+}
+
+type Metrics_stat struct {
+	Vulnerabilities      int `json:"vulnerabilities,omitempty"`
+	VulnerableComponents int `json:"vulnerableComponents,omitempty"`
+	Component            int `json:"component,omitempty"`
+}
+
+type ProjectList []Project
+
 type PurlVersionStruct struct {
 	CurrentVersion *packageurl.PackageURL
 	LatestVersion  *packageurl.PackageURL
-	isVersionEquel bool
+	IsVersionEquel bool
 }
 
-type VulnraibilityListStruct struct {
-	VulnraibilityList VulnraibilityList
-}
-
-type VulnraibilityListMap map[string]VulnraibilityListStruct
+type VulnraibilityListMap map[string]VulnraibilityList
 type PurlVersionStructMap map[string]PurlVersionStruct
 type ComponentList []Component
 type VulnraibilityList []Vulnraibility
 
-const GetAllVulnerabilities string = "/vulnerability/component"
-const GetAllComponent string = "/component/identity"
-const SbomTokenQuery string = "/bom/token/"
-const GetRepositoryLatest string = "/repository/latest"
-const UserLoginPath = "user/login"
-const ApiServerPath = "http://localhost:8081/api/v1"
+const (
+	ApiComponentProject      = "/component/project"
+	ApiVulnrabilityComponent = "/vulnerability/component"
+	ApiComponentIdentity     = "/component/identity"
+	ApiProjectLookup         = "/project/lookup"
+	ApiProject               = "/project"
+	ApiSbomTokenQuery        = "/bom/token"
+	ApiRepositoryLatest      = "/repository/latest"
+	ApiUserLoginPath         = "user/login"
+	ApiServerPath            = "http://localhost:8081/api/v1"
+)
+
+var DefaultPagination = PaginationParams{Offset: "0", Limit: "10000"}
 
 func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
 	cfg := ServiceCfg{ApiToken: access_token, Url: ApiServerPath, Enable: true}
@@ -159,7 +201,7 @@ func (depClient *DepTrackClient) Login(username string, password string) error {
 		"password": {password}, //Read from env DEPEND_TRACK_PASS
 	}
 
-	resp, err := depClient.Post(UserLoginPath, "application/x-www-form-urlencoded", strings.NewReader(login_values.Encode()))
+	resp, err := depClient.Post(ApiUserLoginPath, "application/x-www-form-urlencoded", strings.NewReader(login_values.Encode()))
 	if err != nil {
 		return err
 	}
@@ -234,6 +276,7 @@ func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackS
 	if err != nil {
 		return err
 	}
+
 	err = json.Unmarshal(v, &response)
 	if err != nil {
 		return err
@@ -246,7 +289,7 @@ func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionRespo
 	var latestVersion VersionResponse
 	params := LatestVersionParams{Purl: PURL}
 
-	err := depClient.GetJsonWithParams(GetRepositoryLatest, params, &latestVersion)
+	err := depClient.GetJsonWithParams(ApiRepositoryLatest, params, &latestVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -254,24 +297,60 @@ func (depClient *DepTrackClient) GetRepositoryLatest(PURL string) (*VersionRespo
 	return &latestVersion, nil
 }
 
-func (depClient *DepTrackClient) GetComponentsByPURL(PURL string) (ComponentList, error) {
+func (depClient *DepTrackClient) GetComponentsIdentity(params GetComponentsIdentityParams) (ComponentList, error) {
 	var component_list ComponentList
-	params := GetComponentsByPURLParams{Purl: PURL}
-
-	if err := depClient.GetJsonWithParams(GetAllComponent, params, &component_list); err != nil {
+	if err := depClient.GetJsonWithParams(ApiComponentIdentity, params, &component_list); err != nil {
 		return nil, err
 	}
 
 	return component_list, nil
 }
 
-func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, isSupported bool) (VulnraibilityList, error) {
+func (depClient *DepTrackClient) GetProjectLookup(params GetProjectLookupParams) (*Project, error) {
+
+	var project Project
+	if err := depClient.GetJsonWithParams(ApiProjectLookup, params, &project); err != nil {
+		return nil, err
+	}
+	return &project, nil
+}
+
+func (depClient *DepTrackClient) GetProject(params GetProjectParams) (ProjectList, error) {
+	var project_list ProjectList
+	if err := depClient.GetJsonWithParams(ApiProject, params, &project_list); err != nil {
+		return nil, err
+	}
+	return project_list, nil
+}
+
+func (depClient *DepTrackClient) GetComponentsByProjectUUID(uuid string, pagination_param *PaginationParams) (ComponentList, error) {
+	var component_list ComponentList
+	full_api := ApiComponentProject + "/" + uuid
+	if pagination_param != nil {
+		if err := depClient.GetJsonWithParams(full_api, pagination_param, &component_list); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := depClient.GetJson(full_api, &component_list); err != nil {
+			return nil, err
+		}
+	}
+
+	return component_list, nil
+}
+
+func (depClient *DepTrackClient) GetVulnerabilityComponenetByUUID(uuid string, isSupported bool, pagination_param *PaginationParams) (VulnraibilityList, error) {
 
 	var vulnraibilityList VulnraibilityList
-	FullVulnrabilityPath := GetAllVulnerabilities + "/" + uuid
-
-	if err := depClient.GetJson(FullVulnrabilityPath, &vulnraibilityList); err != nil {
-		return nil, err
+	full_api := ApiVulnrabilityComponent + "/" + uuid
+	if pagination_param != nil {
+		if err := depClient.GetJsonWithParams(full_api, pagination_param, &vulnraibilityList); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := depClient.GetJson(full_api, &vulnraibilityList); err != nil {
+			return nil, err
+		}
 	}
 
 	return vulnraibilityList, nil
@@ -307,13 +386,13 @@ func CmpPurl(a *packageurl.PackageURL, b *packageurl.PackageURL) bool {
 }
 
 func (depClient *DepTrackClient) GetVulnraibilityList(PURL string) (VulnraibilityList, error) {
-	component_list, err := depClient.GetComponentsByPURL(PURL)
+	component_list, err := depClient.GetComponentsIdentity(GetComponentsIdentityParams{Purl: PURL})
 	var final_vulnraibility_list VulnraibilityList
 	if err != nil {
 		return nil, err
 	}
 	for _, componenet := range component_list {
-		vulnraibility_list, err := depClient.GetVulnerabilityComponenetByUUID(componenet.UUID, true)
+		vulnraibility_list, err := depClient.GetVulnerabilityComponenetByUUID(componenet.UUID, true, &DefaultPagination)
 		if err != nil {
 			return nil, err
 		}
@@ -340,6 +419,7 @@ func (depClient *DepTrackClient) GetLatestVersionBySbom(bom *cdx.BOM) (PurlVersi
 			log.Debugf("Get Latest version error skipping, Purl: %s Err: %+v", component.PackageURL, err)
 			continue
 		}
+		// log.Debugf("Old version found, Name: %s, current: %s, latest: %s\n", component.Name, current_version, latest_version)
 		components_map[component.Name] = PurlVersionStruct{current_version, latest_version, is_version_equel}
 	}
 
@@ -363,10 +443,13 @@ func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (Vulnr
 			log.Debugf("Get vulnraibility error skipping, Purl: %s Err: %+v", component.PackageURL, err)
 			return nil, err
 		}
+
 		if len(vulnraibility_list) == 0 {
 			continue
 		}
-		components_map[component.Name] = VulnraibilityListStruct{vulnraibility_list}
+
+		// log.Debugf("Vulnrability found, Name: %s, Purl: %s, Num: %d\n", component.Name, component.PackageURL, len(vulnraibility_list))
+		components_map[component.Name] = vulnraibility_list
 	}
 
 	return components_map, nil
@@ -374,27 +457,36 @@ func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (Vulnr
 
 func (depClient *DepTrackClient) GetSbomDetails(sbom_uuid string) (bool, error) {
 	var sbomProcessingState SbomProcessingState
-	sbom_token_query := SbomTokenQuery + sbom_uuid
-
+	sbom_token_query := ApiSbomTokenQuery + "/" + sbom_uuid
 	if err := depClient.GetJson(sbom_token_query, &sbomProcessingState); err != nil {
 		return false, err
 	}
 
-	return sbomProcessingState.processing, nil
+	return sbomProcessingState.Processing, nil
 }
 
 func (depClient *DepTrackClient) WaitforSbomFinishUpload(sbom_uuid string) (bool, error) {
+	// DefaultAttempts := uint(30)
+	DefaultDelay := 50 * time.Millisecond
+	// DefaultMaxJitter := 10 * time.Millisecond
+	// DefaultOnRetry := func(n uint, err error) {}
+	// DefaultRetryIf := IsRecoverable
+	// DefaultDelayType := retry.CombineDelay(retry.BackOffDelay, RandomDelay)
+	// DefaultLastErrorOnly := false
+	// DefaultContext := context.Background()
+
 	err := retry.Do(
 		func() error {
 			is_finished, err := depClient.GetSbomDetails(sbom_uuid)
 			if err != nil {
-				log.Error("GetSbomDetails failed")
+				return err
 			}
 			if !is_finished {
 				return nil
 			}
-			return nil
+			return errors.New("Processing")
 		},
+		retry.Delay(DefaultDelay),
 	)
 	if err != nil {
 		return false, err

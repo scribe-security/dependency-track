@@ -329,3 +329,7 @@ func (c *ApiClient) MultipartWriter(api string, filename string, params map[stri
 	writer, err := multipart_writer.CreatePart(partHeaders)
 	return multipart_writer, writer, err
 }
+
+func (c *ApiClient) Close() {
+	c.HTTPClient.CloseIdleConnections()
+}
