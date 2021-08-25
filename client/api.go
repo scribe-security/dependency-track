@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	// "github.com/scribe-security/scribe/pkg/log_wrapper"
 	"github.com/sirupsen/logrus"
 )
 

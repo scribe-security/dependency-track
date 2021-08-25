@@ -172,18 +172,21 @@ type ComponentList []Component
 type VulnraibilityList []Vulnraibility
 
 const (
-	ApiComponentProject      = "/component/project"
-	ApiVulnrabilityComponent = "/vulnerability/component"
-	ApiComponentIdentity     = "/component/identity"
-	ApiProjectLookup         = "/project/lookup"
-	ApiProject               = "/project"
-	ApiSbomTokenQuery        = "/bom/token"
-	ApiRepositoryLatest      = "/repository/latest"
-	ApiUserLoginPath         = "user/login"
-	ApiServerPath            = "http://localhost:8081/api/v1"
+	ApiComponentProject       = "/component/project"
+	ApiVulnrabilityComponent  = "/vulnerability/component"
+	ApiComponentIdentity      = "/component/identity"
+	ApiProjectLookup          = "/project/lookup"
+	ApiProject                = "/project"
+	ApiSbomTokenQuery         = "/bom/token"
+	ApiRepositoryLatest       = "/repository/latest"
+	ApiUserLoginPath          = "user/login"
+	ApiServerPath             = "http://localhost:8081/api/v1"
+	BomField                  = "bom"
+	TeamField                 = "team"
+	DefaultMaxPaginationLimit = "10000"
 )
 
-var DefaultPagination = PaginationParams{Offset: "0", Limit: "10000"}
+var DefaultPagination = PaginationParams{Offset: "0", Limit: DefaultMaxPaginationLimit}
 
 func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
 	cfg := ServiceCfg{ApiToken: access_token, Url: ApiServerPath, Enable: true}
@@ -227,7 +230,7 @@ func (depClient *DepTrackClient) GetJsonList(api string) (JSON_LIST, error) {
 }
 
 func (depClient *DepTrackClient) GetTeam() (JSON_LIST, error) {
-	return depClient.GetJsonList("team")
+	return depClient.GetJsonList(TeamField)
 }
 
 func (depClient *DepTrackClient) removeComponents(bom *cdx.BOM) {
@@ -266,7 +269,7 @@ func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackS
 		return err
 	}
 	multipart_writer.Close()
-	resp, err := depClient.Post("bom", multipart_writer.FormDataContentType(), buf)
+	resp, err := depClient.Post(BomField, multipart_writer.FormDataContentType(), buf)
 	if err != nil {
 		return err
 	}
@@ -407,11 +410,7 @@ func (depClient *DepTrackClient) GetLatestVersionBySbom(bom *cdx.BOM) (PurlVersi
 
 	for _, component := range *bom.Components {
 
-		if component.Type != "library" {
-			continue
-		}
-		if component.PackageURL == "" {
-			log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+		if !depClient.checkComponentType(component) {
 			continue
 		}
 		current_version, latest_version, is_version_equel, err := depClient.GetLatestVersion(component.PackageURL)
@@ -419,23 +418,30 @@ func (depClient *DepTrackClient) GetLatestVersionBySbom(bom *cdx.BOM) (PurlVersi
 			log.Debugf("Get Latest version error skipping, Purl: %s Err: %+v", component.PackageURL, err)
 			continue
 		}
-		// log.Debugf("Old version found, Name: %s, current: %s, latest: %s\n", component.Name, current_version, latest_version)
 		components_map[component.Name] = PurlVersionStruct{current_version, latest_version, is_version_equel}
 	}
 
 	return components_map, nil
 }
 
+func (depClient *DepTrackClient) checkComponentType(component cdx.Component) bool {
+	if component.Type != "library" {
+		return false
+	}
+
+	if component.PackageURL == "" {
+		log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+		return false
+	}
+
+	return true
+}
+
 func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (VulnraibilityListMap, error) {
 	components_map := make(VulnraibilityListMap)
 
 	for _, component := range *bom.Components {
-		if component.Type != "library" {
-			continue
-		}
-
-		if component.PackageURL == "" {
-			log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+		if !depClient.checkComponentType(component) {
 			continue
 		}
 		vulnraibility_list, err := depClient.GetVulnraibilityList(component.PackageURL)
@@ -448,7 +454,6 @@ func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (Vulnr
 			continue
 		}
 
-		// log.Debugf("Vulnrability found, Name: %s, Purl: %s, Num: %d\n", component.Name, component.PackageURL, len(vulnraibility_list))
 		components_map[component.Name] = vulnraibility_list
 	}
 
@@ -466,14 +471,7 @@ func (depClient *DepTrackClient) GetSbomDetails(sbom_uuid string) (bool, error) 
 }
 
 func (depClient *DepTrackClient) WaitforSbomFinishUpload(sbom_uuid string) (bool, error) {
-	// DefaultAttempts := uint(30)
 	DefaultDelay := 50 * time.Millisecond
-	// DefaultMaxJitter := 10 * time.Millisecond
-	// DefaultOnRetry := func(n uint, err error) {}
-	// DefaultRetryIf := IsRecoverable
-	// DefaultDelayType := retry.CombineDelay(retry.BackOffDelay, RandomDelay)
-	// DefaultLastErrorOnly := false
-	// DefaultContext := context.Background()
 
 	err := retry.Do(
 		func() error {
