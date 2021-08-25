@@ -2,10 +2,11 @@ package integration
 
 import (
 	"deptrack/client"
-	"deptrack/core"
 	"os"
 	"testing"
 	"time"
+
+	cdx_manager "github.com/scribe-security/scribe/pkg/cyclonedx"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"gotest.tools/assert"
@@ -23,13 +24,13 @@ func GetLocalDepClient(t *testing.T) *client.DepTrackClient {
 	return c
 }
 
-func GetCycloneDxManager(t *testing.T) *core.CycloneDxManager {
-	cyclonedx_manager, err := core.NewCycloneDxManager(core.JSON_FORMAT)
+func GetCycloneDxManager(t *testing.T) *cdx_manager.CycloneDxManager {
+	cyclonedx_manager, err := cdx_manager.NewCycloneDxManager(cdx_manager.JSON_FORMAT)
 	assert.NilError(t, err, "Cyclonedx manager create")
 	return cyclonedx_manager
 }
 
-func ReadSbom(t *testing.T, fixture string, m *core.CycloneDxManager) (*cdx.BOM, string) {
+func ReadSbom(t *testing.T, fixture string, m *cdx_manager.CycloneDxManager) (*cdx.BOM, string) {
 	var bom cdx.BOM
 	err := m.ReadFromFile(fixture, &bom)
 	assert.NilError(t, err, "Read from sbom")
@@ -52,7 +53,7 @@ func PostSbom(t *testing.T, name string, c *client.DepTrackClient, bom *cdx.BOM)
 	return &sbom_response
 }
 
-func BasePostLogic(t *testing.T, path string) (*client.DepTrackClient, *core.CycloneDxManager, *cdx.BOM, *client.DepTrackSbomPostResponse) {
+func BasePostLogic(t *testing.T, path string) (*client.DepTrackClient, *cdx_manager.CycloneDxManager, *cdx.BOM, *client.DepTrackSbomPostResponse) {
 	c := GetLocalDepClient(t)
 	cyclonedx_manager := GetCycloneDxManager(t)
 	bom, name := ReadSbom(t, path, cyclonedx_manager)

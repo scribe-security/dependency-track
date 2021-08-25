@@ -13,6 +13,7 @@ import (
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	retry "github.com/avast/retry-go"
 	packageurl "github.com/package-url/packageurl-go"
+	api_client "github.com/scribe-security/scribe/pkg/client"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -96,7 +97,7 @@ type DepTrackSbomPostResponse struct {
 }
 
 type DepTrackClient struct {
-	*ApiClient
+	*api_client.ApiClient
 	token       string
 	accessToken string
 }
@@ -188,8 +189,8 @@ const (
 var DefaultPagination = PaginationParams{Offset: "0", Limit: DefaultMaxPaginationLimit}
 
 func NewDepTrackClient(access_token string, api_server_path string) (*DepTrackClient, error) {
-	cfg := ServiceCfg{ApiToken: access_token, Url: api_server_path, Enable: true}
-	client, err := NewApiClient(&cfg, false, 0)
+	cfg := api_client.ServiceCfg{ApiToken: access_token, Url: api_server_path, Enable: true}
+	client, err := api_client.NewApiClient(&cfg, false, 0)
 	if err != nil {
 		return nil, err
 	}
