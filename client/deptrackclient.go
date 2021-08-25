@@ -180,7 +180,6 @@ const (
 	ApiSbomTokenQuery         = "/bom/token"
 	ApiRepositoryLatest       = "/repository/latest"
 	ApiUserLoginPath          = "user/login"
-	ApiServerPath             = "http://localhost:8081/api/v1"
 	BomField                  = "bom"
 	TeamField                 = "team"
 	DefaultMaxPaginationLimit = "10000"
@@ -188,8 +187,8 @@ const (
 
 var DefaultPagination = PaginationParams{Offset: "0", Limit: DefaultMaxPaginationLimit}
 
-func NewDepTrackClient(access_token string) (*DepTrackClient, error) {
-	cfg := ServiceCfg{ApiToken: access_token, Url: ApiServerPath, Enable: true}
+func NewDepTrackClient(access_token string, api_server_path string) (*DepTrackClient, error) {
+	cfg := ServiceCfg{ApiToken: access_token, Url: api_server_path, Enable: true}
 	client, err := NewApiClient(&cfg, false, 0)
 	if err != nil {
 		return nil, err
@@ -233,7 +232,7 @@ func (depClient *DepTrackClient) GetTeam() (JSON_LIST, error) {
 	return depClient.GetJsonList(TeamField)
 }
 
-func (depClient *DepTrackClient) removeComponents(bom *cdx.BOM) {
+func (depClient *DepTrackClient) filterComponents(bom *cdx.BOM) {
 	var filtered_componenets []cdx.Component
 	for _, component := range *bom.Components {
 		if component.Type != "file" {
@@ -243,8 +242,21 @@ func (depClient *DepTrackClient) removeComponents(bom *cdx.BOM) {
 	bom.Components = &filtered_componenets
 }
 
+func (depClient *DepTrackClient) checkComponentType(component cdx.Component) bool {
+	if component.Type != "library" {
+		return false
+	}
+
+	if component.PackageURL == "" {
+		log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
+		return false
+	}
+
+	return true
+}
+
 func (depClient *DepTrackClient) PostSbom(api string, deptrack_params *DepTrackSbomPost, bom *cdx.BOM, response *DepTrackSbomPostResponse) error {
-	depClient.removeComponents(bom)
+	depClient.filterComponents(bom)
 
 	buf := new(bytes.Buffer)
 
@@ -424,19 +436,6 @@ func (depClient *DepTrackClient) GetLatestVersionBySbom(bom *cdx.BOM) (PurlVersi
 	return components_map, nil
 }
 
-func (depClient *DepTrackClient) checkComponentType(component cdx.Component) bool {
-	if component.Type != "library" {
-		return false
-	}
-
-	if component.PackageURL == "" {
-		log.Debugf("PURL is empty skippimg, Name: %s", component.Name)
-		return false
-	}
-
-	return true
-}
-
 func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (VulnraibilityListMap, error) {
 	components_map := make(VulnraibilityListMap)
 
@@ -460,7 +459,7 @@ func (depClient *DepTrackClient) GetVulnraibilityListBySbom(bom *cdx.BOM) (Vulnr
 	return components_map, nil
 }
 
-func (depClient *DepTrackClient) GetSbomDetails(sbom_uuid string) (bool, error) {
+func (depClient *DepTrackClient) GetBomStateByToken(sbom_uuid string) (bool, error) {
 	var sbomProcessingState SbomProcessingState
 	sbom_token_query := ApiSbomTokenQuery + "/" + sbom_uuid
 	if err := depClient.GetJson(sbom_token_query, &sbomProcessingState); err != nil {
@@ -475,7 +474,7 @@ func (depClient *DepTrackClient) WaitforSbomFinishUpload(sbom_uuid string) (bool
 
 	err := retry.Do(
 		func() error {
-			is_finished, err := depClient.GetSbomDetails(sbom_uuid)
+			is_finished, err := depClient.GetBomStateByToken(sbom_uuid)
 			if err != nil {
 				return err
 			}

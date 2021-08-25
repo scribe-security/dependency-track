@@ -2,25 +2,11 @@ package integration
 
 import (
 	"deptrack/client"
-	"deptrack/core"
 	"testing"
 
 	cdx "github.com/CycloneDX/cyclonedx-go"
 	"gotest.tools/assert"
 )
-
-func UNUSED(x ...interface{}) {}
-
-func ReadSbom(t *testing.T, fixture string, m *core.CycloneDxManager) (*cdx.BOM, string) {
-	var bom cdx.BOM
-	err := m.ReadFromFile(fixture, &bom)
-	assert.NilError(t, err, "Read from sbom")
-
-	name, err := m.GetName(&bom)
-	assert.NilError(t, err, "Get sbom name")
-
-	return &bom, name
-}
 
 func TestCycloneDxRead(t *testing.T) {
 	tests := []struct {

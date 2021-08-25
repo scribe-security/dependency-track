@@ -11,12 +11,14 @@ import (
 	"gotest.tools/assert"
 )
 
+const ApiServerPath = "http://localhost:8081/api/v1"
+
 func GetLocalDepClient(t *testing.T) *client.DepTrackClient {
 	api_key, ok := os.LookupEnv("API_KEY")
 	if !ok {
 		t.Fatalf("No api key")
 	}
-	c, err := client.NewDepTrackClient(api_key)
+	c, err := client.NewDepTrackClient(api_key, ApiServerPath)
 	assert.NilError(t, err, "Failed to create client")
 	return c
 }
@@ -25,6 +27,17 @@ func GetCycloneDxManager(t *testing.T) *core.CycloneDxManager {
 	cyclonedx_manager, err := core.NewCycloneDxManager(core.JSON_FORMAT)
 	assert.NilError(t, err, "Cyclonedx manager create")
 	return cyclonedx_manager
+}
+
+func ReadSbom(t *testing.T, fixture string, m *core.CycloneDxManager) (*cdx.BOM, string) {
+	var bom cdx.BOM
+	err := m.ReadFromFile(fixture, &bom)
+	assert.NilError(t, err, "Read from sbom")
+
+	name, err := m.GetName(&bom)
+	assert.NilError(t, err, "Get sbom name")
+
+	return &bom, name
 }
 
 func PostSbom(t *testing.T, name string, c *client.DepTrackClient, bom *cdx.BOM) *client.DepTrackSbomPostResponse {
