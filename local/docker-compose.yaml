@@ -16,7 +16,7 @@ services:
     environment:
     - POSTGRES_USER=dtrack
     - POSTGRES_PASSWORD=dtrack
-    image: 'postgres'
+    image: 'postgres:13.4-alpine'
     ports:
       - "15432:5432"
     volumes:
