@@ -40,6 +40,11 @@ bootstrap-dtrack: $(TEMPDIR) ## Download dependancy track latest docker-compose 
 .PHONY: start-local
 start-local:  ## Deploy local API, Frontend services (docker-compose)
 	@docker-compose -p ${PROJECT} -f $(DOCKER_COMPOSE) up  -d 
+
+
+.PHONY: start-local
+start-local-setup-users:  ## Deploy local API, Frontend services (docker-compose)
+	@docker-compose -p ${PROJECT} -f $(DOCKER_COMPOSE) up  -d 
 	@make setup-users
 
 .PHONY: stop-local
