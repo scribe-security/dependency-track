@@ -1,5 +1,6 @@
 PROJECT = dtrack
 BIN = dtrack
+TEMPDIR = ./.tmp
 LOCALDIR = local
 DOCKER_COMPOSE = ./$(LOCALDIR)/docker-compose.yaml
 RESULTSDIR = test/results
